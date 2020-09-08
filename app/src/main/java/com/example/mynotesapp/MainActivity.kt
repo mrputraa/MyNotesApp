@@ -1,11 +1,15 @@
 package com.example.mynotesapp
 
 import android.content.Intent //
+import android.database.ContentObserver
 import androidx.appcompat.app.AppCompatActivity //
 import android.os.Bundle //
+import android.os.Handler
+import android.os.HandlerThread
 import android.view.View //
 import androidx.recyclerview.widget.LinearLayoutManager //
 import com.example.mynotesapp.adapter.NoteAdapter //
+import com.example.mynotesapp.db.DatabaseContract.NoteColumns.Companion.CONTENT_URI
 import com.example.mynotesapp.db.NoteHelper //
 import com.example.mynotesapp.entity.Note //
 import com.example.mynotesapp.helper.MappingHelper //
@@ -44,11 +48,23 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(intent, NoteAddUpdateActivity.REQUEST_ADD)
         }
 
-        noteHelper = NoteHelper.getInstance(applicationContext)
-        noteHelper.open()
+        val handlerThread = HandlerThread("DataObserver")
+        handlerThread.start()
+        val handler = Handler(handlerThread.looper)
 
-        // proses ambil data
-        loadNotesAsync()
+        val myObserver = object : ContentObserver(handler){
+            override fun onChange(self: Boolean) {
+                loadNotesAsync()
+            }
+        }
+
+        contentResolver.registerContentObserver(CONTENT_URI, true, myObserver)
+
+//        noteHelper = NoteHelper.getInstance(applicationContext)
+//        noteHelper.open()
+//
+//        // proses ambil data
+//        loadNotesAsync()
 
         if (savedInstanceState == null) {
             // proses ambil data
@@ -115,7 +131,8 @@ class MainActivity : AppCompatActivity() {
         GlobalScope.launch(Dispatchers.Main) {
             progressbar.visibility = View.VISIBLE
             val deferredNotes = async(Dispatchers.IO) {
-                val cursor = noteHelper.queryAll()
+                val cursor = contentResolver?.query(CONTENT_URI, null, null, null, null)
+                //val cursor = noteHelper.queryAll()
                 MappingHelper.mapCursorToArrayList(cursor)
             }
             progressbar.visibility = View.INVISIBLE
